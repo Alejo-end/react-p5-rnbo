@@ -18,6 +18,7 @@ import {
   setupDefaults,
   windowResizedDefaults,
 } from 'util/defaults'
+import { NavigationLinks } from './NavigationLinks'
 
 export interface SketchWrapperProps
   extends Omit<SketchProps, 'keyPressed' | 'mouseClicked' | 'setup'> {
@@ -146,6 +147,7 @@ const SketchWrapper: FC<SketchWrapperProps> = ({
         },
       }}
     >
+      <NavigationLinks />
       <Sketch
         className="canvas-wrapper"
         setup={defaultSetup}

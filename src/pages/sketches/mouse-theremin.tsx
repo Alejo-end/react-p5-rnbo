@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { Button } from '@chakra-ui/react'
+import { Button, Box, Flex } from '@chakra-ui/react'
 import { createDevice } from '@rnbo/js'
 import SketchWrapper from 'components/SketchWrapper'
 import { Volume2, VolumeX } from 'lucide-react'
@@ -113,7 +113,7 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
         setIsMuted(newMutedState)
 
         if (gainParamRef.current) {
-            gainParamRef.current.normalizedValue = newMutedState ? 0 : volume
+            gainParamRef.current.normalizedValue = newMutedState ? 0 : 0.6
         }
     }
 
@@ -146,21 +146,21 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
     }, [children])
 
     return (
-        <div className="relative w-full h-screen">
+        <Box position="relative" w="full" h="100vh">
             {/* Top Controls */}
-            <div className="absolute top-4 left-4 right-4 flex justify-center z-10">
-                <div className="flex items-center gap-4 rounded-md bg-black/50 p-2">
+            <Flex position="absolute" top={10} left={4} right={4} justifyContent="center" zIndex={10}>
+                <Flex alignItems="center" gap={4} rounded="md" bg="blackAlpha.700" p={2}>
                     <Button
                         onClick={toggleMute}
                         variant="ghost"
-                        size="icon"
-                        className="text-white hover:text-white/80"
+                        size="sm"
+                        colorScheme="whiteAlpha"
                         aria-label={isMuted ? "Unmute" : "Mute"}
                     >
-                        {isMuted ? <VolumeX className="h-6 w-6" /> : <Volume2 className="h-6 w-6" />}
+                        {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
                     </Button>
-                </div>
-            </div>
+                </Flex>
+            </Flex>
 
             <SketchWrapper
                 setup={setup}
@@ -169,11 +169,15 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
                 padding={padding}
                 background={background}
             />
-            <div
+            <Box
                 ref={childrenContainerRef}
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                position="absolute"
+                left="50%"
+                top="50%"
+                transform="translate(-50%, -50%)"
+                pointerEvents="none"
             />
-        </div>
+        </Box>
     )
 }
 
