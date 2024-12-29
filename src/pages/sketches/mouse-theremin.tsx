@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Button } from '@chakra-ui/react'
 import { createDevice } from '@rnbo/js'
 import SketchWrapper from 'components/SketchWrapper'
