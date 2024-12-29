@@ -1,9 +1,3 @@
-## What Is This Project?
-
-**FIRST AND FOREMOST**, this project is largely based on Matt DesLaurier's [`canvas-sketch`](https://github.com/mattdesl/canvas-sketch). 
-
-This project is an attempt to be an accessible, low barrier to entry sketchbook for generative art. The styling is minimal, and the rest of the opinionated pieces _should_ be largely abstracted away.
-
 ## Getting Started
 
 First, run the development server:
