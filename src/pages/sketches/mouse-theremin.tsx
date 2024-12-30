@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { Button, Box, Flex } from '@chakra-ui/react'
+import { Button, Box, Flex, Text } from '@chakra-ui/react'
 import { createDevice } from '@rnbo/js'
 import SketchWrapper from 'components/SketchWrapper'
 import { Volume2, VolumeX } from 'lucide-react'
@@ -177,6 +177,15 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
                 transform="translate(-50%, -50%)"
                 pointerEvents="none"
             />
+            <Text
+                position="absolute"
+                bottom={20}
+                left="50%"
+                transform="translateX(-50%)"
+                fontSize="12px"
+            >
+                Mouse Theremin, based on a phasor help patch.
+            </Text>
         </Box>
     )
 }

@@ -1,6 +1,7 @@
 import SketchWrapper from 'components/SketchWrapper'
 import { NextPage } from 'next'
 import { useState } from 'react'
+import { Text } from '@chakra-ui/react'
 import { ColorValue, Draw, Setup } from 'types/CustomP5'
 
 const PianoSketch: NextPage = () => {
@@ -74,6 +75,16 @@ const PianoSketch: NextPage = () => {
                 mousePressed={mousePressed}
                 mouseReleased={mouseReleased}
             />
+
+            <Text
+                position="absolute"
+                bottom={20}
+                left="50%"
+                transform="translateX(-50%)"
+                fontSize="12px"
+            >
+                Piano, still a work in progress.
+            </Text>
         </div>
     )
 }
