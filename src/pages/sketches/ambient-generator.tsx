@@ -23,11 +23,12 @@ const AmbientGenerator: NextPage = () => {
     const deviceRef = useRef<Device | null>(null)
     const gainNodeRef = useRef<GainNode | null>(null)
 
-    const [volume, setVolume] = useState<number>(0.8)
+    const [volume, setVolume] = useState<number>(0.7)
     const [isMuted, setIsMuted] = useState<boolean>(false)
     const [knobSize, setKnobSize] = useState<number>(60)
     const [textSize, setTextSize] = useState<number>(14)
     const [spacing, setSpacing] = useState<number>(120)
+    const [isAudioInitialized, setIsAudioInitialized] = useState<boolean>(false)
 
     const [parameters, setParameters] = useState<KnobParameter[]>([
         { name: 'interval', value: 0.5, min: 0, max: 1, category: 'global' },
@@ -50,9 +51,9 @@ const AmbientGenerator: NextPage = () => {
             const sectionWidth = width / 4 // 4 categories
 
             // Calculate sizes based on screen width
-            const newKnobSize = Math.min(60, sectionWidth * 0.3)
-            const newTextSize = Math.min(14, newKnobSize * 0.3)
-            const newSpacing = Math.min(120, height * 0.25)
+            const newKnobSize = Math.min(60, sectionWidth * 0.4)
+            const newTextSize = Math.min(14, newKnobSize * 0.35)
+            const newSpacing = Math.min(120, height * 0.5)
 
             setDimensions([width, height])
             setKnobSize(newKnobSize)
@@ -74,6 +75,7 @@ const AmbientGenerator: NextPage = () => {
             gainNodeRef.current.gain.value = volume
             gainNodeRef.current.connect(audioContextRef.current.destination)
             await loadRNBO(audioContextRef.current)
+            setIsAudioInitialized(true)
         }
     }
 
@@ -153,13 +155,13 @@ const AmbientGenerator: NextPage = () => {
 
             p5.fill(200)
             p5.textSize(textSize * 1.2)
-            p5.text(category.toUpperCase(), sectionIndex * sectionWidth + sectionWidth / 2, 90)
+            p5.text(category.toUpperCase(), sectionIndex * sectionWidth + sectionWidth / 2, 40)
 
             const categoryParams = parameters.filter(p => p.category === category)
             categoryParams.forEach((param, paramIndex) => {
                 const parameterIndex = parameters.findIndex(p => p.name === param.name)
                 const x = sectionIndex * sectionWidth + sectionWidth / 2
-                const y = 160 + paramIndex * spacing
+                const y = 120 + paramIndex * spacing
 
                 p5.push()
                 p5.translate(x, y)
@@ -271,8 +273,11 @@ const AmbientGenerator: NextPage = () => {
                 left="50%"
                 transform="translateX(-50%)"
                 fontSize="12px"
+                userSelect="none"
             >
-                Ambient Generator, based on the IDM5r patch.
+                {isAudioInitialized ?
+                    'Ambient Generator, based on the IDM5r patch. Turn the knobs to modify the sound.' :
+                    'Click to "Play" to begin'}
             </Text>
         </Box>
     )
