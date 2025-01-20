@@ -76,18 +76,18 @@ const PianoSketch: NextPage = () => {
     // MIDI setup
     useEffect(() => {
         const setupMIDI = async () => {
-            try {
+            try {/* 
                 const midiAccess = await navigator.requestMIDIAccess()
                 midiAccess.inputs.forEach(input => {
                     input.onmidimessage = handleMIDIMessage
-                })
+                }) */
             } catch (err) {
                 console.error('MIDI setup failed:', err)
                 setError('MIDI setup failed. You can still use mouse clicks.')
             }
         }
 
-        setupMIDI()
+        //setupMIDI()
 
         return () => {
             if (audioContextRef.current) {
