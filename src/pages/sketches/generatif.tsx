@@ -10,27 +10,28 @@ const Generatif: NextPage = () => {
     const dimensions: number[] = [width, height]
     const background: ColorValue = [255, 253, 252]
     const padding: number[] = [40]
-    let nb = 30;
-    let dim = 0;
-    let margin = 0;
+    const nb = 30;
+    const margin = 0;
+    const dim = (width - 2 * margin) / nb;
 
     const setup: Setup = p5 => {
-        dim = (width - 2 * margin) / nb;
         p5.noLoop()
     }
 
     const draw: Draw = p5 => {
         p5.background(255)
+        // The grid is laid out at 2048 px; the canvas fits the window.
+        p5.scale(p5.width / width)
         for (let j = 0; j < nb; j = j + 1) {
             for (let i = 0; i < nb; i = i + 1) {
-                let x = margin + i * dim;
-                let y = margin + j * dim;
+                const x = margin + i * dim;
+                const y = margin + j * dim;
                 p5.noFill();
                 // stroke(220);
                 // rect(x,y, dim, dim);
                 p5.stroke(0);
                 p5.strokeWeight(4);
-                let rnd = p5.int(p5.random(0, 4));
+                const rnd = p5.int(p5.random(0, 4));
                 if (rnd == 0) {
                     p5.line(x, y, x + dim, y + dim);
                 }
@@ -80,7 +81,7 @@ const Generatif: NextPage = () => {
                 >
                     <b>Generatif</b>  - based on the work of Vera Molnár.
                     <br />
-                    <b>Click</b> to redraw. <b>'s'</b> to save.
+                    <b>Click</b> to redraw. <b>&apos;s&apos;</b> to save.
                 </Text>
             </div>
     )

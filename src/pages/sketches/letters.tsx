@@ -1,8 +1,10 @@
 import SketchWrapper from 'components/SketchWrapper';
 import { NextPage } from 'next';
 import { Text } from '@chakra-ui/react';
+import type { Font } from 'p5';
+import { useRef } from 'react';
 
-import { ColorValue, Draw, KeyPressed, MouseClicked, Setup } from 'types/CustomP5';
+import { ColorValue, Draw, KeyPressed, MouseClicked, P5 } from 'types/CustomP5';
 
 const Letters: NextPage = () => {
     const width: number = 500;
@@ -11,26 +13,23 @@ const Letters: NextPage = () => {
     const background: ColorValue = [0, 0, 0];
     const padding: number[] = [0];
 
-    let font: any;
-    let points: any[] = [];
+    // The page re-renders after p5 starts, and p5 then calls the newest
+    // draw, which cannot see a variable that the first render's preload set.
+    const fontRef = useRef<Font | null>(null);
     const txt = "Aalto?";
-    let xTxt = 0, yTxt = 250;
+    const xTxt = width / 2, yTxt = height / 2;
     const fontSize = 100;
 
-    const preload = (p5: any) => {
-        font = p5.loadFont('/fonts/HostGrotesk-Regular.ttf');
+    const preload = (p5: P5) => {
+        fontRef.current = p5.loadFont('/fonts/HostGrotesk-Regular.ttf');
     };
-    const setup: Setup = (p5) => {
-        p5.createCanvas(width, height);
-        xTxt = width / 2;
-        yTxt = height / 2;
-        computePoints(p5, 0.1);
-    };
-
     const draw: Draw = (p5) => {
-        computePoints(p5, p5.map(p5.mouseX, 0, width, 0.005, 0.1));
+        // On a narrow window the canvas shrinks to fit; the text shrinks with it.
+        const scale = p5.width / width;
+        const points = computePoints(p5.map(p5.mouseX / scale, 0, width, 0.005, 0.1, true));
 
         p5.background(0);
+        p5.scale(scale);
         p5.noFill();
         p5.stroke(255);
 
@@ -47,17 +46,20 @@ const Letters: NextPage = () => {
         }
     };
 
-    const computePoints = (p5: any, factor: number) => {
-        points = font.textToPoints(txt, xTxt, yTxt, fontSize, {
+    const computePoints = (factor: number): { x: number; y: number }[] => {
+        const font = fontRef.current;
+        if (!font) return [];
+        const points = font.textToPoints(txt, xTxt, yTxt, fontSize, {
             sampleFactor: factor,
-        });
+        }) as { x: number; y: number }[];
 
-        const bounds = font.textBounds(txt, xTxt, yTxt, fontSize);
+        const bounds = font.textBounds(txt, xTxt, yTxt, fontSize) as { x: number; w: number; h: number };
         for (let i = 0; i < points.length; i++) {
             const p = points[i];
             p.x -= bounds.x - xTxt + bounds.w / 2;
             p.y += bounds.h / 2;
         }
+        return points;
     };
 
     const keyPressed: KeyPressed = (p5) => {
@@ -74,7 +76,6 @@ const Letters: NextPage = () => {
         <div className="cursor-pointer">
             <SketchWrapper
                 preload={preload}
-                setup={setup}
                 draw={draw}
                 keyPressed={keyPressed}
                 mouseClicked={mouseClicked}

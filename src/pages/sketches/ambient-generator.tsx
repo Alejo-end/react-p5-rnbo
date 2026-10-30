@@ -22,6 +22,8 @@ const AmbientGenerator: NextPage = () => {
     const audioContextRef = useRef<AudioContext | null>(null)
     const deviceRef = useRef<Device | null>(null)
     const gainNodeRef = useRef<GainNode | null>(null)
+    // Resolves once the patch is loaded; that waits for the first click.
+    const deviceReadyRef = useRef<Promise<Device> | null>(null)
 
     const [volume, setVolume] = useState<number>(0.7)
     const [isMuted, setIsMuted] = useState<boolean>(false)
@@ -74,12 +76,13 @@ const AmbientGenerator: NextPage = () => {
             gainNodeRef.current = audioContextRef.current.createGain()
             gainNodeRef.current.gain.value = volume
             gainNodeRef.current.connect(audioContextRef.current.destination)
-            await loadRNBO(audioContextRef.current)
+            deviceReadyRef.current = loadRNBO(audioContextRef.current)
+            await deviceReadyRef.current
             setIsAudioInitialized(true)
         }
     }
 
-    const loadRNBO = async (audioContext: AudioContext) => {
+    const loadRNBO = async (audioContext: AudioContext): Promise<Device> => {
         await audioContext.resume()
         const rawPatcher = await fetch('/patches/idm5r.json')
         const patcher = await rawPatcher.json()
@@ -92,6 +95,7 @@ const AmbientGenerator: NextPage = () => {
                 updateParameter(index, rnboParam.normalizedValue)
             }
         })
+        return device
     }
 
     const updateParameter = (index: number, value: number) => {
@@ -123,13 +127,16 @@ const AmbientGenerator: NextPage = () => {
         }
     }
 
-    const triggerRun = () => {
-        if (deviceRef.current) {
-            const event = new MessageEvent(TimeNow, "run", [1]);
-            deviceRef.current.scheduleEvent(event);
-        } else {
+    const triggerRun = async () => {
+        // Browsers start audio only after a click, so this click resumes the
+        // context and the first press waits for the patch to finish loading.
+        await audioContextRef.current?.resume()
+        const device = deviceRef.current ?? (await deviceReadyRef.current)
+        if (!device) {
             console.error('Device not initialized.')
+            return
         }
+        device.scheduleEvent(new MessageEvent(TimeNow, "run", [1]))
     }
 
     const setup: Setup = (p5) => {
@@ -277,7 +284,7 @@ const AmbientGenerator: NextPage = () => {
             >
                 {isAudioInitialized ?
                     'Ambient Generator, based on the IDM5r patch. Turn the knobs to modify the sound.' :
-                    'Click to "Play" to begin'}
+                    'Click "Play" to begin'}
             </Text>
         </Box>
     )

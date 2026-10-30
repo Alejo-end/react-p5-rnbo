@@ -1,6 +1,6 @@
 // Next inlines its bootstrap scripts, so scripts stay on 'unsafe-inline' but
-// only from this origin. @rnbo/js 1.3 evaluates each patch's code as a string
-// and loads its audio worklet from a blob: URL. Client-side navigation keeps
+// only from this origin. @rnbo/js evaluates each patch's code as a string and
+// loads its audio worklet from a blob: URL. Client-side navigation keeps
 // the first page's policy, so both hold for every page. Chakra injects styles;
 // the font comes from Google.
 const csp = [
