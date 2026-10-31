@@ -1,5 +1,5 @@
 import { Flex, Icon, Text } from "@chakra-ui/react"
-import { Home, Sparkles, StepBack } from "lucide-react"
+import { StepBack } from "lucide-react"
 import Link from "next/link"
 
 

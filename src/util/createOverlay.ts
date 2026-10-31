@@ -5,7 +5,7 @@ const createOverlay = (
   background: ColorValue = [255, 253, 252],
   margin: number = p5.width * 0.1
 ): Graphics => {
-  let overlay = p5.createGraphics(p5.width, p5.height)
+  const overlay = p5.createGraphics(p5.width, p5.height)
   overlay.background(background as unknown as Color)
   overlay.erase()
   overlay.rect(margin, margin, p5.width - margin * 2, p5.height - margin * 2)

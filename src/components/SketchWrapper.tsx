@@ -40,11 +40,12 @@ export interface SketchWrapperProps
 
 const Sketch = dynamic<SketchWrapperProps>(
   () =>
-    import('react-p5').then(mod => {
-      require('p5.js-svg')
+    // p5.js-svg extends the p5 that react-p5 puts on window, so it loads second.
+    import('react-p5').then(async mod => {
+      await import('p5.js-svg')
 
       return mod.default
-    }) as Promise<ComponentClass<SketchWrapperProps, any>>,
+    }) as Promise<ComponentClass<SketchWrapperProps>>,
   {
     ssr: false,
   }

@@ -1,4 +1,5 @@
 import type P5Types from 'p5'
+import type { RENDERER } from 'p5'
 import { KeyboardEvent, MouseEvent } from 'react'
 
 export type P5Function = (p5: P5) => void
@@ -21,6 +22,6 @@ export interface WeightedColor {
 }
 
 export interface P5 extends P5Types {
-  constructor: { [key: string]: any }
-  SVG?: any
+  /** The renderer that p5.js-svg adds. */
+  SVG?: RENDERER
 }

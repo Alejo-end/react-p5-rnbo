@@ -8,17 +8,18 @@ const Circles: NextPage = () => {
     const dimensions: number[] = [width, height]
     const background: ColorValue = [255, 253, 252]
     const padding: number[] = [40]
-    let nb = 10;
-    let dim = 0;
-    let margin = 80;
+    const nb = 10;
+    const margin = 80;
+    const dim = (width - 2 * margin) / nb;
 
     const setup: Setup = p5 => {
         p5.background(background)
-        dim = (width - 2 * margin) / nb;
     }
 
     const draw: Draw = p5 => {
         p5.background(0)
+        // The grid is laid out at 2048 px; the canvas fits the window.
+        p5.scale(p5.width / width)
         //noStroke;
         //fill (255); 
         p5.stroke(255);

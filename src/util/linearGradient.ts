@@ -10,8 +10,8 @@ const linearGradient = (
   c1: ColorValue,
   c2: ColorValue
 ) => {
-  let ctx = p5.drawingContext as CanvasRenderingContext2D
-  let gradient = ctx.createLinearGradient(x1, y1, x2, y2)
+  const ctx = p5.drawingContext as CanvasRenderingContext2D
+  const gradient = ctx.createLinearGradient(x1, y1, x2, y2)
   gradient.addColorStop(0, p5.color(c1 as unknown as Color).toString())
   gradient.addColorStop(1, p5.color(c2 as unknown as Color).toString())
 

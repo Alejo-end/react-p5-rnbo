@@ -1,53 +1,45 @@
-// @ts-nocheck
 import { Button, Box, Flex, Text } from '@chakra-ui/react'
-import { createDevice } from '@rnbo/js'
+import { createDevice, Device, IPatcher, Parameter } from '@rnbo/js'
 import SketchWrapper from 'components/SketchWrapper'
 import { Volume2, VolumeX } from 'lucide-react'
 import { NextPage } from 'next'
 import { useEffect, useRef, useState } from 'react'
 import { ColorValue, Draw, Setup } from 'types/CustomP5'
 
-interface AudioVisualizerProps {
-    children?: React.ReactNode;
-}
-
-const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
+const AudioVisualizer: NextPage = () => {
     // State for dimensions
-    const [dimensions, setDimensions] = useState<number[]>([1024, 768])
+    // Only p5 reads this, so the window size can seed it on the client
+    // without a hydration mismatch.
+    const [dimensions, setDimensions] = useState<number[]>(() =>
+        typeof window !== 'undefined' ? [window.innerWidth, window.innerHeight] : [1024, 768]
+    )
     const padding: number[] = [0]
     const background: ColorValue = [0, 0, 100]
 
     // Refs for audio context and parameters
-    const childrenContainerRef = useRef(null)
-    const audioContextRef = useRef(null)
-    const deviceRef = useRef(null)
-    const xParamRef = useRef(null)
-    const yParamRef = useRef(null)
-    const gainParamRef = useRef(null)
-    const reactRootRef = useRef(null)
+    const audioContextRef = useRef<AudioContext | null>(null)
+    const deviceRef = useRef<Device | null>(null)
+    const xParamRef = useRef<Parameter | null>(null)
+    const yParamRef = useRef<Parameter | null>(null)
+    const gainParamRef = useRef<Parameter | null>(null)
+    // The patch's own gain, restored on unmute
+    const gainValueRef = useRef(0.6)
 
     // State
     const [isMuted, setIsMuted] = useState(false)
-    const [volume, setVolume] = useState(1)
-    const [gainValue, setGainValue] = useState<number>()
 
-    // Update dimensions when window is available
+    // Follow the window size
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        const handleResize = () => {
             setDimensions([window.innerWidth, window.innerHeight])
-
-            const handleResize = () => {
-                setDimensions([window.innerWidth, window.innerHeight])
-            }
-
-            window.addEventListener('resize', handleResize)
-            return () => window.removeEventListener('resize', handleResize)
         }
+
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
     }, [])
 
-    const initAudio = async (p5: any) => {
+    const initAudio = async () => {
         if (typeof window !== 'undefined' && !audioContextRef.current) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext
             audioContextRef.current = new AudioContext()
             await loadRNBO(audioContextRef.current)
         }
@@ -57,21 +49,21 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
         await audioContext.resume()
 
         const rawPatcher = await fetch('/patches/patch.export.json')
-        const patcher = await rawPatcher.json()
+        const patcher: IPatcher = await rawPatcher.json()
 
         const device = await createDevice({ context: audioContext, patcher })
         deviceRef.current = device
 
         device.node.connect(audioContext.destination)
 
-        xParamRef.current = device.parametersById.get('x')
-        yParamRef.current = device.parametersById.get('y')
+        xParamRef.current = device.parametersById.get('x') ?? null
+        yParamRef.current = device.parametersById.get('y') ?? null
 
-        const gainParam = device.parametersById.get('gain')
+        const gainParam = device.parametersById.get('gain') ?? null
         gainParamRef.current = gainParam
 
         if (gainParam) {
-            setGainValue(gainParam.normalizedValue)
+            gainValueRef.current = gainParam.normalizedValue
         }
     }
 
@@ -87,7 +79,7 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
             }
         }
 
-        initAudio(p5)
+        initAudio()
     }
 
     const draw: Draw = (p5) => {
@@ -113,37 +105,17 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
         setIsMuted(newMutedState)
 
         if (gainParamRef.current) {
-            gainParamRef.current.normalizedValue = newMutedState ? 0 : 0.6
-        }
-    }
-
-    const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const newVolume = parseFloat(event.target.value)
-        setVolume(newVolume)
-
-        if (gainParamRef.current && !isMuted) {
-            gainParamRef.current.normalizedValue = newVolume
+            gainParamRef.current.normalizedValue = newMutedState ? 0 : gainValueRef.current
         }
     }
 
     useEffect(() => {
         return () => {
-            if (reactRootRef.current) {
-                reactRootRef.current.unmount()
-                reactRootRef.current = null
-            }
-
             if (audioContextRef.current) {
                 audioContextRef.current.close()
             }
         }
     }, [])
-
-    useEffect(() => {
-        if (reactRootRef.current && children) {
-            reactRootRef.current.render(children)
-        }
-    }, [children])
 
     return (
         <Box position="relative" w="full" h="100vh">
@@ -168,14 +140,6 @@ const AudioVisualizer: NextPage<AudioVisualizerProps> = ({ children }) => {
                 dimensions={dimensions}
                 padding={padding}
                 background={background}
-            />
-            <Box
-                ref={childrenContainerRef}
-                position="absolute"
-                left="50%"
-                top="50%"
-                transform="translate(-50%, -50%)"
-                pointerEvents="none"
             />
             <Text
                 position="absolute"

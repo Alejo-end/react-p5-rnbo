@@ -2,39 +2,72 @@ import SketchWrapper from 'components/SketchWrapper'
 import { NextPage } from 'next'
 import { useState, useEffect, useRef } from 'react'
 import { Text, Box, Button, HStack } from '@chakra-ui/react'
-import { ColorValue, Draw, Setup } from 'types/CustomP5'
-import { createDevice, Device, TimeNow, MessageEvent } from '@rnbo/js'
+import { ColorValue, Draw, P5, Setup } from 'types/CustomP5'
+import { createDevice, Device, IPatcher, MIDIEvent, TimeNow } from '@rnbo/js'
 import { Play } from 'lucide-react'
+
+// One octave from middle C. Each black key sits on the right edge of the
+// white key it is listed under.
+const whiteNotes = [60, 62, 64, 65, 67, 69, 71]
+const blackKeys = [
+    { after: 0, note: 61 },
+    { after: 1, note: 63 },
+    { after: 3, note: 66 },
+    { after: 4, note: 68 },
+    { after: 5, note: 70 },
+]
+const keyWidth = 60
+const keyHeight = 220
+const blackWidth = keyWidth * 0.6
+const blackHeight = keyHeight * 0.6
+const blackX = (after: number) => (after + 1) * keyWidth - blackWidth / 2
+
+// The patch has no inports: notes go in as MIDI on port 0.
+const noteOn = (note: number, velocity: number) => new MIDIEvent(TimeNow, 0, [0x90, note, velocity])
+const noteOff = (note: number) => new MIDIEvent(TimeNow, 0, [0x80, note, 0])
 
 const PianoSketch: NextPage = () => {
     // Canvas dimensions and styling
-    const width: number = 4 * 60
-    const height: number = 220
+    const width: number = whiteNotes.length * keyWidth
+    const height: number = keyHeight
     const dimensions: number[] = [width, height]
     const padding: number[] = [40]
     const background: ColorValue = [200]
+    const volume = 0.8
 
     // Audio context and device refs
     const audioContextRef = useRef<AudioContext | null>(null)
     const deviceRef = useRef<Device | null>(null)
     const gainNodeRef = useRef<GainNode | null>(null)
+    const midiAccessRef = useRef<MIDIAccess | null>(null)
+    // The note the mouse is holding down, released on mouse up.
+    const mouseNoteRef = useRef<number | null>(null)
 
     // State for audio settings and loading
-    const [volume, setVolume] = useState<number>(0.8)
     const [isLoading, setIsLoading] = useState(false)
     const [isAudioInitialized, setIsAudioInitialized] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Starting MIDI note number for the first key (C4 = 60)
-    const startNote = 60
+    // Notes sounding now, from the mouse or a MIDI keyboard
+    const [pressedNotes, setPressedNotes] = useState<number[]>([])
 
-    // State for tracking pressed keys
-    const [pressedKeys, setPressedKeys] = useState<boolean[]>([false, false, false, false, false, false])
+    const handleNoteOn = (note: number, velocity: number) => {
+        if (!deviceRef.current) return
+        deviceRef.current.scheduleEvent(noteOn(note, velocity))
+        setPressedNotes(prev => (prev.includes(note) ? prev : [...prev, note]))
+    }
+
+    const handleNoteOff = (note: number) => {
+        if (!deviceRef.current) return
+        deviceRef.current.scheduleEvent(noteOff(note))
+        setPressedNotes(prev => prev.filter(n => n !== note))
+    }
 
     // Initialize audio context and RNBO device
     const initAudio = async () => {
         try {
             setIsLoading(true)
+            setError(null)
             if (typeof window !== 'undefined' && !audioContextRef.current) {
                 const AudioContext = window.AudioContext
                 audioContextRef.current = new AudioContext()
@@ -43,6 +76,7 @@ const PianoSketch: NextPage = () => {
                 gainNodeRef.current.connect(audioContextRef.current.destination)
                 await loadRNBO(audioContextRef.current)
                 setIsAudioInitialized(true)
+                setupMIDI()
             } else if (audioContextRef.current?.state === 'suspended') {
                 await audioContextRef.current.resume()
                 setIsAudioInitialized(true)
@@ -50,144 +84,129 @@ const PianoSketch: NextPage = () => {
             setIsLoading(false)
         } catch (err) {
             console.error('Audio initialization failed:', err)
-            setError('Failed to initialize audio. Please try again.')
+            // Let the next click start over.
+            audioContextRef.current?.close()
+            audioContextRef.current = null
+            setError('Audio did not start. Click "Start Audio" to try again.')
             setIsLoading(false)
         }
     }
 
     // Load RNBO patch
     const loadRNBO = async (audioContext: AudioContext) => {
-        try {
-            await audioContext.resume()
-            const rawPatcher = await fetch('/patches/piano.json')
-            if (!rawPatcher.ok) {
-                throw new Error('Failed to load piano patch')
-            }
-            const patcher = await rawPatcher.json()
-            const device = await createDevice({ context: audioContext, patcher })
-            deviceRef.current = device
-            device.node.connect(gainNodeRef.current!)
-        } catch (err) {
-            console.error('RNBO loading failed:', err)
+        await audioContext.resume()
+        const rawPatcher = await fetch('/patches/piano.json')
+        if (!rawPatcher.ok) {
             throw new Error('Failed to load piano patch')
+        }
+        const patcher: IPatcher = await rawPatcher.json()
+        const device = await createDevice({ context: audioContext, patcher })
+        // Every envelope parameter starts at 0, which is silent. The
+        // exported preset holds the sound the patch was made with.
+        const preset = patcher.presets?.[0]?.preset
+        if (preset) device.setPreset(preset)
+        deviceRef.current = device
+        device.node.connect(gainNodeRef.current!)
+    }
+
+    // A MIDI keyboard plays the same notes. Asked only after audio starts,
+    // so the permission prompt follows a click.
+    const setupMIDI = async () => {
+        if (!navigator.requestMIDIAccess) return
+        try {
+            const midiAccess = await navigator.requestMIDIAccess()
+            midiAccessRef.current = midiAccess
+            midiAccess.inputs.forEach(input => {
+                input.onmidimessage = handleMIDIMessage
+            })
+        } catch (err) {
+            console.error('MIDI setup failed:', err)
+            setError('No MIDI access. You can still click the keys.')
         }
     }
 
-    // MIDI setup
-    useEffect(() => {
-        const setupMIDI = async () => {
-            try {/* 
-                const midiAccess = await navigator.requestMIDIAccess()
-                midiAccess.inputs.forEach(input => {
-                    input.onmidimessage = handleMIDIMessage
-                }) */
-            } catch (err) {
-                console.error('MIDI setup failed:', err)
-                setError('MIDI setup failed. You can still use mouse clicks.')
-            }
+    const handleMIDIMessage = (message: MIDIMessageEvent) => {
+        if (!message.data) return
+        const data = message.data
+        const status = data[0], note = data[1], velocity = data[2]
+        const command = status & 0xf0
+        if (command === 0x90 && velocity > 0) {
+            handleNoteOn(note, velocity)
+        } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+            handleNoteOff(note)
         }
+    }
 
-        //setupMIDI()
-
+    useEffect(() => {
         return () => {
+            midiAccessRef.current?.inputs.forEach(input => {
+                input.onmidimessage = null
+            })
             if (audioContextRef.current) {
                 audioContextRef.current.close()
             }
         }
     }, [])
 
-    const handleMIDIMessage = (message: any) => {
-        if (!isAudioInitialized) return
-
-        const [status, note, velocity] = message.data
-        if (status === 144 && velocity > 0) {
-            handleNoteOn(note, velocity)
-        } else if (status === 128 || (status === 144 && velocity === 0)) {
-            handleNoteOff(note)
-        }
-    }
-
-    const handleNoteOn = (note: number, velocity: number) => {
-        const keyIndex = note - startNote
-        if (keyIndex >= 0 && keyIndex < pressedKeys.length) {
-            const newPressedKeys = [...pressedKeys]
-            newPressedKeys[keyIndex] = true
-            setPressedKeys(newPressedKeys)
-
-            if (deviceRef.current) {
-                const noteOnEvent = new MessageEvent(TimeNow, "note", [note, velocity])
-                deviceRef.current.scheduleEvent(noteOnEvent)
-            }
-        }
-    }
-
-    const handleNoteOff = (note: number) => {
-        const keyIndex = note - startNote
-        if (keyIndex >= 0 && keyIndex < pressedKeys.length) {
-            const newPressedKeys = [...pressedKeys]
-            newPressedKeys[keyIndex] = false
-            setPressedKeys(newPressedKeys)
-
-            if (deviceRef.current) {
-                const noteOffEvent = new MessageEvent(TimeNow, "note", [note, 0])
-                deviceRef.current.scheduleEvent(noteOffEvent)
-            }
-        }
-    }
-
     const setup: Setup = p5 => {
         p5.textAlign(p5.CENTER, p5.CENTER)
     }
 
+    // On a narrow window the canvas shrinks to fit; the keys shrink with it.
+    const scaleOf = (p5: P5) => p5.width / width
+
     const draw: Draw = p5 => {
         p5.background(background[0])
-
-        const keyWidth = 60
-        const keyHeight = 220
-        const blackKeyOffset = 40
-        const whiteKeys = [true, true, true, true, true, true]
-        const blackKeys = [true, true, true]
+        p5.scale(scaleOf(p5))
 
         // Draw white keys
         p5.strokeWeight(1)
         p5.stroke(100)
-        for (let i = 0; i < whiteKeys.length; i++) {
-            if (pressedKeys[i]) {
+        whiteNotes.forEach((note, i) => {
+            if (pressedNotes.includes(note)) {
                 p5.fill(255, 255, 150)
             } else {
                 p5.fill(255)
             }
             p5.rect(i * keyWidth, 0, keyWidth, keyHeight)
-        }
+        })
 
         // Draw black keys
-        p5.fill(0)
-        for (let i = 0; i < blackKeys.length; i++) {
-            if (blackKeys[i]) {
-                p5.rect(i * keyWidth + blackKeyOffset, 0, keyWidth * 0.6, keyHeight * 0.6)
+        blackKeys.forEach(({ after, note }) => {
+            if (pressedNotes.includes(note)) {
+                p5.fill(110, 110, 40)
+            } else {
+                p5.fill(0)
             }
-        }
+            p5.rect(blackX(after), 0, blackWidth, blackHeight)
+        })
     }
 
-    const mousePressed = (p5: any) => {
+    // Black keys lie on top, so they win where they overlap a white key.
+    const noteAt = (x: number, y: number): number | null => {
+        if (x < 0 || x >= width || y < 0 || y >= height) return null
+        if (y < blackHeight) {
+            const black = blackKeys.find(({ after }) => x >= blackX(after) && x < blackX(after) + blackWidth)
+            if (black) return black.note
+        }
+        return whiteNotes[Math.floor(x / keyWidth)]
+    }
+
+    const mousePressed = (p5: P5) => {
         if (!isAudioInitialized) return
 
-        const keyWidth = 60
-        for (let i = 0; i < pressedKeys.length; i++) {
-            if (p5.mouseX > i * keyWidth && p5.mouseX < (i + 1) * keyWidth) {
-                handleNoteOn(startNote + i, 100)
-            }
+        const note = noteAt(p5.mouseX / scaleOf(p5), p5.mouseY / scaleOf(p5))
+        if (note !== null) {
+            mouseNoteRef.current = note
+            handleNoteOn(note, 100)
         }
     }
 
     const mouseReleased = () => {
-        if (!isAudioInitialized) return
-
-        pressedKeys.forEach((isPressed, i) => {
-            if (isPressed) {
-                handleNoteOff(startNote + i)
-            }
-        })
+        if (mouseNoteRef.current !== null) {
+            handleNoteOff(mouseNoteRef.current)
+            mouseNoteRef.current = null
+        }
     }
 
     return (
@@ -235,9 +254,10 @@ const PianoSketch: NextPage = () => {
                     fontSize="12px"
                     userSelect="none"
                 >
-                    {isAudioInitialized ?
-                        'MIDI Piano, connect your MIDI keyboard. Click to play notes.' :
-                        'Click "Start Audio" to begin'}
+                    {error ??
+                        (isAudioInitialized
+                            ? 'MIDI Piano, connect your MIDI keyboard. Click to play notes.'
+                            : 'Click "Start Audio" to begin')}
                 </Text>
             </div>
         </Box>
